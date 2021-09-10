@@ -6,7 +6,7 @@ import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from control import MainWindow
 
-if __name__ == "__main__":
+def run():
     conn_window = QApplication(sys.argv)
     w = MainWindow()
     w.setWindowTitle('Memory Game')
