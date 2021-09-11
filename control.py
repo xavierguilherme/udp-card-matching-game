@@ -2,26 +2,6 @@ from PyQt5.QtCore import pyqtSlot
 from PyQt5 import QtTest
 from PyQt5.QtWidgets import QMainWindow, QStackedWidget, QWidget
 from design import MainWindowUI
-import random
-import os
-
-def shuffle_cards():
-    pars = {}
-
-    cards_obj = [f'img{i + 1}' for i in range(30)]
-    # random.shuffle(cards_obj)
-
-    imgs = os.listdir('imgs/')
-
-    for _ in range(15):
-        c1 = cards_obj.pop(random.randint(0, len(cards_obj) - 1))
-        c2 = cards_obj.pop(random.randint(0, len(cards_obj) - 1))
-        img = imgs.pop(random.randint(0, len(imgs) - 1))
-
-        pars[c1] = (c2, img)
-        pars[c2] = (c1, img)
-
-    return pars
 
 
 class GameWindow(QMainWindow, MainWindowUI):
@@ -53,10 +33,15 @@ class GameWindow(QMainWindow, MainWindowUI):
 
 
 class MainWindow(QStackedWidget):
-    def __init__(self):
+    def __init__(self, p1, p2, cards, action):
         super().__init__()
         self.w1 = GameWindow()
         self.addWidget(self.w1)
+
+        self.w1.p1_pts.setText(p1)
+        self.w1.p2_pts.setText(p2)
+        self.pars = cards
+        self.server_action = action
 
         self.w1.mouseReleaseEvent = self.card_click
 
@@ -64,32 +49,32 @@ class MainWindow(QStackedWidget):
         self.is_player_1 = True
         self.w1.p1_pts.setStyleSheet("color: red")
 
-        self.pars = shuffle_cards()
-
     @pyqtSlot()
     def card_click(self, event):
         pos = event.pos()
         card = self.childAt(pos)
         card_name = card.objectName()
 
-        if card_name not in self.pars:
+        if (len(self.cards_turned) > 0 and card_name in self.cards_turned[0]) \
+                or card_name not in self.pars:
             return
 
         img = self.pars[card_name][1]
 
-        card.setStyleSheet(f"""
-            #{card_name} {{
-                background-image: url(imgs/{img});
-                background-repeat: no-repeat;
-                background-position: center;
-            }}
-        """)
+        if len(self.cards_turned) < 2:
+            card.setStyleSheet(f"""
+                #{card_name} {{
+                    background-image: url(imgs/{img});
+                    background-repeat: no-repeat;
+                    background-position: center;
+                }}
+            """)
 
-        self.cards_turned.append((card_name, card),)
+            self.cards_turned.append((card_name, card), )
 
-        QtTest.QTest.qWait(800)
+            QtTest.QTest.qWait(800)
 
-        self.is_match()
+            self.is_match()
 
     @pyqtSlot()
     def is_match(self):
@@ -103,10 +88,10 @@ class MainWindow(QStackedWidget):
                     p2 = self.w1.p2_pts.text().split(': ')
                     self.w1.p2_pts.setText(f'{p2[0]}: {int(p2[1]) + 1}')
 
-                #remove pars from dict
+                # remove pars from dict
                 self.pars.pop(self.cards_turned[0][0])
                 self.pars.pop(self.cards_turned[1][0])
-            else: #return image and next player
+            else:  # return image and next player
                 self.is_player_1 = not self.is_player_1
                 if self.is_player_1:
                     self.w1.p1_pts.setStyleSheet("color: red")
