@@ -1,7 +1,5 @@
 # pyuic5 -x main_window.ui -o design.py
 
-from PyQt5.QtCore import pyqtSlot
-from PyQt5 import QtTest
 from PyQt5.QtWidgets import QMainWindow, QStackedWidget, QWidget
 from design import MainWindowUI
 
@@ -40,12 +38,11 @@ class MainWindow(QStackedWidget):
 
         self.setWindowTitle('Memory Game')
         self.resize(1031, 653)
-
         self.w1 = GameWindow()
         self.addWidget(self.w1)
 
-        self.w1.p1_pts.setText(p1)
-        self.w1.p2_pts.setText(p2)
+        self.w1.p1_pts.setText(p1 + ' : 0')
+        self.w1.p2_pts.setText(p2 + ' : 0')
         self.w1.p1_pts.setStyleSheet("color: red")
 
         self.w1.mouseReleaseEvent = action

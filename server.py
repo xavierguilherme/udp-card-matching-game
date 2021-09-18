@@ -4,9 +4,20 @@ import random
 import os
 import uuid
 
-SERVER_PORT = 7777
+SERVER_PORT = 7788
+# SERVER_IP = '25.102.154.225'
 SERVER_IP = '192.168.3.6'
 
+
+# NRD -- USED WHEN A NEW ROUND IS ABOUT TO START
+# SGM -- USED TO THE START THE GAME BETWEEN TWO PLAYERS
+# UAE -- USED WHEN AN USERNAME THAT ALREADY EXISTS IS TYPED
+# UPS -- USED TO UPDATE THE SCORE OF A GAME
+# FLC -- USED TO FLIP THE CARDS WHEN A PLAYER MISSES A PAIR
+# GFN -- USED WHEN THE PAIRS WERE FLIPPED AND THE GAME IS FINISHED
+# NWU -- USED TO CREATE A NEW USER IN THE SERVER
+# CKE -- USED WHEN AN EVENT (CLICK) HAPPENS IN THE GAME UI
+# LOB -- USED TO TELL THE PLAYER IS BACK IN THE LOBBY
 
 def shuffle_cards():
     pars = {}
@@ -28,32 +39,33 @@ def shuffle_cards():
 
 class Server:
     def __init__(self):
-        self.lobby = {}
-        self.games = {}
+        self.players = []  # MAINTAIN INFORMATION ABOUT ALL THE PLAYERS IN THE SERVER
 
-        self.cards = {}
-        self.cards_turned = {}
+        self.lobby = {}  # HOLD ALL THE PLAYERS THAT ARE WAITING FOR A GAME TO START
+        self.games = {}  # {GAME_ID: P1: {ADDR, SCORE, TURN}, P2: {ADDR, SCORE, TURN}}
+        self.cards = {}  # MAINTAIN INFORMATION ABOUT THE CARDS WITHIN EACH GAME
+        self.cards_turned = {}  # MAINTAIN INFORMATION ABOUT THE TWO CARDS TURNED IN A ROUND
 
         self.socket = socket(AF_INET, SOCK_DGRAM)
         self.socket.bind((SERVER_IP, SERVER_PORT))
-        print('Server is on...')
+        print('$-- SERVER ONLINE --$')
 
     def start(self):
         while True:
             client_msg, client_addr = self.socket.recvfrom(1500)
-            decod_client_msg = client_msg.decode().split('|')
+            decod_msg = client_msg.decode().split('|')
 
-            if decod_client_msg[0] == 'NEW_USER':
-                msg = 'ERR|This username already exists. Try another one.'
-                if decod_client_msg[1] not in self.lobby \
-                        and decod_client_msg[1] not in self.games:
-                    self.lobby[decod_client_msg[1]] = client_addr
-                    msg = f'SUCC|Welcome {decod_client_msg[1]}. Finding an opponent...'
-                    print(f'{client_addr} - {decod_client_msg[1]} joined the game.')
+            if decod_msg[0] == 'NWU':
+                msg = 'UAE|This username already exists. Try another one.'
+                if decod_msg[1] not in self.players:
+                    self.lobby[decod_msg[1]] = client_addr
+                    self.players.append(decod_msg[1])
+                    msg = f'SUC|Welcome {decod_msg[1]}. Finding an opponent...'
+                    print(f'{client_addr} - {decod_msg[1]} joined the game.')
                 self.socket.sendto(msg.encode(), client_addr)
-            elif decod_client_msg[0] == 'CLICK_EVENT':
-                self.click_event(decod_client_msg[1], decod_client_msg[2], decod_client_msg[3],
-                                 decod_client_msg[4], decod_client_msg[5])
+            elif decod_msg[0] == 'CKE':
+                self.click_event(decod_msg[1], decod_msg[2], decod_msg[3],
+                                 decod_msg[4], decod_msg[5])
 
             if len(self.lobby) > 1:
                 player_1 = random.choice(list(self.lobby.keys()))
@@ -68,12 +80,14 @@ class Server:
                 self.cards[game_id] = cards
                 self.cards_turned[game_id] = []
 
-                msg = f'START_GAME|{game_id}|{player_1}: 0|{player_2}: 0'
+                msg = f'SGM|{game_id}|{player_1}|{player_2}'
+                print(f'Game started: {player_1} vs {player_2}')
                 self.socket.sendto(msg.encode(), player_1_addr)
                 self.socket.sendto(msg.encode(), player_2_addr)
 
     def click_event(self, game_id, player, card, pos_x, pos_y):
-        if not card.startswith('img'): return
+        if not card.startswith('img'):
+            return
 
         img = self.cards[game_id][card][1]
 
@@ -82,52 +96,47 @@ class Server:
             return
 
         if len(self.cards_turned[game_id]) < 2:
-            for _, values in self.games[game_id].items():
-                self.socket.sendto(f'FLIP_CARD|{pos_x}|{pos_y}|{img}'.encode(), values[0])
+
+            for player_info in self.games[game_id].values():
+                self.socket.sendto(f'FLC|{pos_x}|{pos_y}|{img}|'.encode(), player_info[0])
 
             self.cards_turned[game_id].append((card, (pos_x, pos_y)))
 
-            self.is_match(game_id, player, self.cards_turned[game_id])
+            if len(self.cards_turned[game_id]) == 2:
+                self.is_match(game_id, player, self.cards_turned[game_id])
 
-        players = list(self.games[game_id].keys())
         if len(self.cards[game_id]) == 0:
-            for _, values in self.games[game_id].items():
-                self.socket.sendto(f'GAME_FINISHED|{players[0]}|{self.games[game_id][players[0]][1]}|'
-                                   f'{players[1]}|{self.games[game_id][players[1]][1]}'.encode(), values[0])
-
+            for player, player_info in self.games[game_id].items():
+                self.socket.sendto(f'GFN|{game_id}'.encode(), player_info[0])
+                self.lobby[player] = self.games[game_id][player][0]
             self.cards.pop(game_id)
             self.cards_turned.pop(game_id)
-            self.lobby[players[0]] = self.games[game_id][players[0]][0]
-            self.lobby[players[1]] = self.games[game_id][players[1]][0]
 
-            for player, values in self.games[game_id].items():
-                self.socket.sendto(f'LOBBY|Welcome back to the lobby {player}. '
-                                   f'We\'re trying to find another opponent.'.encode(), values[0])
-
+            for player, player_info in self.games[game_id].items():
+                self.socket.sendto(f'LOB|Welcome back to the lobby {player}. '
+                                   f'We\'re trying to find another opponent.'.encode(), player_info[0])
             self.games.pop(game_id)
 
     def is_match(self, game_id, player, cards_turned):
         players = list(self.games[game_id].keys())
         pos = 1 if players[0] == player else 2
-        if len(self.cards_turned[game_id]) == 2:
-            if self.cards[game_id][cards_turned[0][0]][0] == cards_turned[1][0]:
-                # remove pars from dict
-                self.cards[game_id].pop(cards_turned[0][0])
-                self.cards[game_id].pop(cards_turned[1][0])
-                # add points
-                self.games[game_id][player][1] = self.games[game_id][player][1] + 1
-                for _, values in self.games[game_id].items():
-                    self.socket.sendto(f'UPDATE_SCORE|{player}|{self.games[game_id][player][1]}|'
-                                       f'{pos}'.encode(), values[0])
-            else:  # return image and next player
-                self.games[game_id][players[0]][2] = not self.games[game_id][players[0]][2]
-                self.games[game_id][players[1]][2] = not self.games[game_id][players[1]][2]
 
-                for _, values in self.games[game_id].items():
-                    self.socket.sendto(f'NEW_ROUND|{pos}|{cards_turned[0][1][0]}|{cards_turned[0][1][1]}|'
-                                       f'{cards_turned[1][1][0]}|{cards_turned[1][1][1]}'.encode(), values[0])
+        if self.cards[game_id][cards_turned[0][0]][0] == cards_turned[1][0]:  # MATCHED
+            self.cards[game_id].pop(cards_turned[0][0])
+            self.cards[game_id].pop(cards_turned[1][0])
+            self.games[game_id][player][1] = self.games[game_id][player][1] + 1
+            for player_info in self.games[game_id].values():
+                self.socket.sendto(f'UPS|{player}|{self.games[game_id][player][1]}|'
+                                   f'{pos}'.encode(), player_info[0])
+        else:  # UNMATCHED
+            self.games[game_id][players[0]][2] = not self.games[game_id][players[0]][2]
+            self.games[game_id][players[1]][2] = not self.games[game_id][players[1]][2]
 
-            self.cards_turned[game_id] = []
+            for player_info in self.games[game_id].values():
+                self.socket.sendto(f'NRD|{pos}|{cards_turned[0][1][0]}|{cards_turned[0][1][1]}|'
+                                   f'{cards_turned[1][1][0]}|{cards_turned[1][1][1]}'.encode(), player_info[0])
+
+        self.cards_turned[game_id] = []
 
 
 if __name__ == '__main__':
