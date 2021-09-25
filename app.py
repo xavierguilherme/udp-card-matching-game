@@ -36,7 +36,7 @@ class MainWindow(QStackedWidget):
     def __init__(self, p1, p2, action):
         super().__init__()
 
-        self.setWindowTitle('Memory Game')
+        self.setWindowTitle(f'Memory Game < {p1} vs {p2} >')
         self.resize(1031, 653)
         self.w1 = GameWindow()
         self.addWidget(self.w1)
