@@ -137,5 +137,3 @@ class MainWindowUI(object):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Memory Game"))
-        self.p1_pts.setText(_translate("MainWindow", "Player 1: 0"))
-        self.p2_pts.setText(_translate("MainWindow", "Player 2: 0"))

@@ -39,7 +39,6 @@ class Client:
         self.exit_game = False
 
         self.fern = None
-        # self.fern = Fernet(KEY)
 
         self.set_username()
 
@@ -105,7 +104,7 @@ class Client:
         card_name = card.objectName()
         card.setStyleSheet(f"""
                             #{card_name} {{
-                                background-image: url(imgs/{img_file});
+                                background-image: url(./cards/{img_file});
                                 background-repeat: no-repeat;
                                 background-position: center;
                             }}
@@ -135,7 +134,7 @@ class Client:
             card_name = card.objectName()
             card.setStyleSheet(f"""
                     #{card_name} {{
-                        background-image: url(cards.png);
+                        background-image: url(./client/imgs/cards.png);
                         background-repeat: no-repeat;
                         background-position: center;
                     }}
@@ -150,7 +149,6 @@ class Client:
                                (SERVER_IP, SERVER_PORT))
             msg, server_addr = self.socket.recvfrom(1500)
             decod_msg = msg.decode().split('|')
-            print(decod_msg)
             if decod_msg[0] == 'UAE':
                 print(decod_msg[1])
                 username = input('Enter your username: ')

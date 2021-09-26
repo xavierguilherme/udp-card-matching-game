@@ -1,5 +1,3 @@
-# pyuic5 -x main_window.ui -o design.py
-
 from PyQt5.QtWidgets import QMainWindow, QStackedWidget, QWidget
 from design import MainWindowUI
 
@@ -11,7 +9,7 @@ class GameWindow(QMainWindow, MainWindowUI):
 
         self.setStyleSheet("""
         #MainWindow {
-            background-image: url(background.jpg);
+            background-image: url(./client/imgs/background.jpg);
             background-repeat: no-repeat;
             background-position: center;
         }
@@ -25,7 +23,7 @@ class GameWindow(QMainWindow, MainWindowUI):
         for i in range(30):
             self.findChild(QWidget, f'img{i + 1}').setStyleSheet(f"""
                 #img{i + 1} {{
-                    background-image: url(cards.png);
+                    background-image: url(./client/imgs/cards.png);
                     background-repeat: no-repeat;
                     background-position: center;
                 }}

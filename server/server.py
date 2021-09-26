@@ -34,7 +34,7 @@ def shuffle_cards():
 
     cards_obj = [f'img{i + 1}' for i in range(30)]
 
-    imgs = os.listdir('imgs/')
+    imgs = os.listdir('./cards/')
 
     for _ in range(15):
         c1 = cards_obj.pop(random.randint(0, len(cards_obj) - 1))
