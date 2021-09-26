@@ -1,36 +1,36 @@
 #!/usr/bin/python3
+import sys
 import threading
-from socket import socket, AF_INET, SOCK_DGRAM
 
 from PyQt5 import QtTest
 from PyQt5.QtWidgets import QApplication
 
-from cryptography.fernet import Fernet
-
 from app import MainWindow
 
-KEY = 'VWllRVh4TE5nb3hDenVxWUFCVHpmdGZWUFZLZ2dTa1k='
+from socket import socket, AF_INET, SOCK_DGRAM
+from cryptography.fernet import Fernet
 
-SERVER_PORT = 7766
-# SERVER_IP = '25.102.154.225'
-SERVER_IP = '192.168.3.6'
+SERVER_IP = sys.argv[1]
+SERVER_PORT = int(sys.argv[2])
 
-# SGM -- USED TO THE START THE GAME BETWEEN TWO PLAYERS
-# UAE -- USED WHEN AN USERNAME THAT ALREADY EXISTS IS TYPED
-# SUC -- USED TO INDICATE IT'S A VALID USERNAME
-# FLC -- USED TO FLIP THE CARDS WHEN A PLAYER MAKE A PLAY
-# UPS -- USED TO UPDATE THE SCORE OF A GAME
-# NRD -- USED WHEN A NEW ROUND IS ABOUT TO START
-# GFN -- USED WHEN THE PAIRS WERE FLIPPED AND THE GAME IS FINISHED
-# NWU -- USED TO CREATE A NEW USER IN THE SERVER
-# CKE -- USED WHEN AN EVENT (CLICK) HAPPENS IN THE GAME UI
-# WCL -- USED TO TELL THE SERVER THE GAME WINDOW WAS CLOSED BY THE PLAYER
-# WCM -- TELLS THE PLAYERS OF A GAME THAT ONE OF THE PLAYERS CLOSED THE WINDOW, SO THEY ARE BACK TO THE LOBBY
+# Application Layer Protocol:
+# SGM -- START THE GAME BETWEEN TWO PLAYERS
+# UAE -- THE USERNAME ALREADY EXISTS IN THE SERVER
+# SUC -- INDICATES A VALID USERNAME
+# FLC -- FLIP THE CARDS WHEN A PLAYER MAKE A PLAY
+# UPS -- UPDATE THE SCORE OF A GAME
+# NRD -- ACTION NEEDS TO BE DONE WHEN A NEW ROUND IS ABOUT TO START
+# GFN -- INDICATES ALL THE PAIRS WERE FLIPPED AND THE GAME IS FINISHED
+# NWU -- CREATE A NEW USER IN THE SERVER
+# CKE -- AN EVENT (CLICK) HAPPENS IN THE GAME UI
+# WCL -- THE GAME WINDOW WAS CLOSED BY THE PLAYER
+# WCM -- ONE OF THE PLAYERS CLOSED THE WINDOW SO THE OTHER ONE SHOULD BE BACK TO THE LOBBY
 
 
 class Client:
     def __init__(self):
         self.conn_window = QApplication([])
+        # Creating UDP socket
         self.socket = socket(AF_INET, SOCK_DGRAM)
         self.username = ''
         self.game_id = ''
@@ -38,11 +38,15 @@ class Client:
         self.closed_window = True
         self.exit_game = False
 
-        self.fern = Fernet(KEY)
+        self.fern = None
+        # self.fern = Fernet(KEY)
 
         self.set_username()
 
     def start(self):
+        # First function to be called when a game is about to start
+        # Wait for a SGM signal from the server and start the player's game window
+        # Also creates a thread to execute listen_server and perform actions between players
         while True:
             print('Welcome to the lobby. Looking for an opponent...')
             server_msg, server_addr = self.socket.recvfrom(1500)
@@ -65,6 +69,8 @@ class Client:
                     exit()
 
     def listen_server(self):
+        # Receives most of the server messages and decides which operations needs to be done
+        # based on the opcodes defined for the protocol
         while True:
             msg, server_addr = self.socket.recvfrom(1500)
             decod_msg = self.fern.decrypt(msg).decode().split('|')
@@ -92,6 +98,8 @@ class Client:
                 break
 
     def handle_flc(self, pos_x, pos_y, img_file):
+        # Receives a server message to flip the card choosed by player in it's turn
+        # Waits a few ms so that the second card flipped appears in the UI
         card = self.game_window.childAt(int(pos_x),
                                         int(pos_y))
         card_name = card.objectName()
@@ -105,12 +113,15 @@ class Client:
         QtTest.QTest.qWait(800)
 
     def handle_ups(self, player, player_score, prev_play):
+        # Update the score of a player after a match
         if int(prev_play) == 1:
             self.game_window.w1.p1_pts.setText(f'{player} : {player_score}')
         else:
             self.game_window.w1.p2_pts.setText(f'{player} : {player_score}')
 
     def handle_nrd(self, prev_play, c1_pos_x, c1_pos_y, c2_pos_x, c2_pos_y):
+        # Restart the game UI every time a player missed a pair,
+        # so the cards need to be flipped again and the player turn should change
         if int(prev_play) == 1:
             self.game_window.w1.p2_pts.setStyleSheet("color: red")
             self.game_window.w1.p1_pts.setStyleSheet("color: white")
@@ -131,21 +142,27 @@ class Client:
                 """)
 
     def set_username(self):
+        # Needed to make the first interaction with the server
+        # This function is fully executed only when an username is validated by the server
         username = input('Enter your username: ')
         while True:
-            self.socket.sendto(self.fern.encrypt(f'NWU|{username.strip()}'.encode()),
+            self.socket.sendto(f'NWU|{username.strip()}'.encode(),
                                (SERVER_IP, SERVER_PORT))
             msg, server_addr = self.socket.recvfrom(1500)
-            decod_msg = self.fern.decrypt(msg).decode().split('|')
+            decod_msg = msg.decode().split('|')
+            print(decod_msg)
             if decod_msg[0] == 'UAE':
                 print(decod_msg[1])
                 username = input('Enter your username: ')
             else:
+                self.fern = Fernet(decod_msg[1])
                 self.username = username
-                print(decod_msg[1])
                 break
 
     def click_event(self, click):
+        # Every time a player clicks the UI, this function is called
+        # A CKE message is sent to the server with the information about
+        # the object clicked and it's position, so the action can be decided and done by the server
         pos = click.pos()
         card = self.game_window.childAt(pos)
         card_name = card.objectName()
